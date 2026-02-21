@@ -37,8 +37,6 @@ long long EncScheme::generate_valid_q(
 
 // Private functions
 long long EncScheme::generate_valid_n(int lambda_, int tau_, int delta){
-    //TODO
-
     constexpr long long c = 10;
     return static_cast<long long>(
         std::ceil(std::pow(tau_, (2 / delta)) * std::pow(lambda_, (c / delta))) // Use ceiling to make sure it does not get smaller
@@ -89,6 +87,16 @@ EncScheme::EncScheme(int lambda_, int items, LHE lhe_, Polynomial poly_):
 
     // Check whether the parameters are valid:
     if (k >= n) throw std::invalid_argument("k >= n!");
+}
+
+void EncScheme::print() {
+    // Print out all the parameters
+    std::cout << "lambda: " << this->lambda << std::endl;
+    std::cout << "tau: " << this->tau << std::endl;
+    std::cout << "delta: " << this->delta << std::endl;
+    std::cout << "q: " << this->q << std::endl;
+    std::cout << "n: " << this->n << std::endl;
+    std::cout << "k: " << this->k << std::endl;
 }
 
 //-------------------Below are the functions used for the SHE scheme----------------------

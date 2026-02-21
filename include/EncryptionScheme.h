@@ -70,6 +70,9 @@ public:
     shescheme::Ciphertext mult(const shescheme::Ciphertext& ct1, const shescheme::Ciphertext& ct2);
     shescheme::Ciphertext compact(const shescheme::Ciphertext& expanded_ct, const shescheme::Ciphertext& ek);
     long long decrypt(const shescheme::Ciphertext& ct);
+
+    // For debugging
+    void print();
 };
 
 class BatchEncScheme: EncScheme {

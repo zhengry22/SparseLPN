@@ -1,4 +1,3 @@
-#pragma once
 #include "polynomial.h"
 
 Polynomial::Polynomial(std::vector<std::string> vars): variables(vars) {}

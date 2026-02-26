@@ -3,19 +3,19 @@
 #include <NTL/mat_ZZ.h>
 #include <NTL/vec_ZZ.h>
 #include "SparseMatrix.h"
-
+//#define MULT
 using namespace std;
 using namespace NTL;
 
 int main() {
     // --- 1. 参数设置 ---
-    long m = 3; // 矩阵行数 (建议先用小规模验证逻辑)
-    long n = 5;  // 矩阵列数
-    long p = 4;
-    int k1 = 2;   // 每行非零元
-    int k2 = 3;
-    int k3 = 4;
-    ZZ q = conv<ZZ>("31");
+    long m = 100; // 矩阵行数 (建议先用小规模验证逻辑)
+    long n = 200;  // 矩阵列数
+    long p = 150;
+    int k1 = 30;   // 每行非零元
+    int k2 = 40;
+    int k3 = 20;
+    ZZ q = conv<ZZ>("65537");
 
     // --- 2. 采样两个 RDiag 矩阵 ---
     // 假设采样器返回 std::unique_ptr
@@ -101,18 +101,22 @@ int main() {
     auto ptr_for_mul = std::make_unique<SparseMatrixCSR>(sB_mul);
     auto sProdBase = (*uR1) * uB_mul;
     auto& sProd = dynamic_cast<SparseMatrixCSR&>(*sProdBase);
-
+#ifdef MULT
+    cout << "row number of result: " << sProd.getrows() << endl;
+    cout << "col number of result: " << sProd.getcols() << endl;
+#endif 
     mat_ZZ dB_mul = ToDense(sB_mul);
     mat_ZZ dProd_gold = dA * dB_mul;
-
+#ifdef MULT
     cout << "A: " << dA << endl;
     cout << "B: " << dB_mul << endl;
-
+#endif
     for(long i=0; i<m; i++) for(long j=0; j<p; j++) dProd_gold[i][j] %= q;
     mat_ZZ todenseprod = ToDense(sProd);
+#ifdef MULT    
     cout << "正确的矩阵乘法: " << dProd_gold << endl;
     cout << "实际做的乘法: " << todenseprod << endl;
-
+#endif
     if (todenseprod == dProd_gold) cout << "[PASS] 矩阵乘法(SpGEMM)正确" << endl;
     else cout << "[FAIL] 矩阵乘法(SpGEMM)不一致" << endl;
 

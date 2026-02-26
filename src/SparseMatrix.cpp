@@ -194,7 +194,7 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator*(const std::unique_ptr<S
 
     if (this->cols != b_ptr->getrows()) throw runtime_error("Dimension mismatch");
 
-    auto C = std::make_unique<SparseMatrixCSR>(rows, cols, q);
+    auto C = std::make_unique<SparseMatrixCSR>(rows, B->getcols(), q);
     vector<long> C_col_indices;
     vector<ZZ> C_values;
     C->row_ptr[0] = 0;

@@ -39,6 +39,8 @@ public:
     // 4. 矩阵乘法：C = A * B
     virtual std::unique_ptr<SparseMatrix> operator*(const std::unique_ptr<SparseMatrix>& B) const = 0;
 
+
+    virtual bool operator==(const std::unique_ptr<SparseMatrix>& B) const = 0;
     // 在稀疏矩阵末尾添加新的一列
     //virtual std::unique_ptr<SparseMatrix> addnewcolumn(const vec_ZZ& b) const = 0;
 
@@ -75,6 +77,21 @@ public:
 
     // 还要添加一个接口，能够将一个向量当中的元素添加到稀疏矩阵的最后一列
     //std::unique_ptr<SparseMatrix> addnewcolumn(const vec_ZZ& b) const override;
+    bool operator==(const std::unique_ptr<SparseMatrix>& B) const override {
+        auto b_ptr = dynamic_cast<SparseMatrixCSR*>(B.get());
+    
+        // 2. 安全检查：如果 B 实际上不是 CSR 格式，转换会返回 nullptr
+        if (!b_ptr) {
+            throw std::runtime_error("Equality only supported between two CSR matrices");
+        }
+
+        return (this->rows == B->getrows()
+             && this->cols == B->getcols()
+             && this->q == B->getmod()
+             && this->row_ptr == b_ptr->row_ptr
+             && this->col_indices == b_ptr->col_indices
+             && this->values == b_ptr->values);
+    }
 
     friend NTL::mat_ZZ ToDense(SparseMatrixCSR& sparse);
 };

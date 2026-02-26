@@ -181,6 +181,7 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator+(const std::unique_ptr<S
         }
         C->row_ptr[i+1] = C->col_indices.size();
     }
+    C->sparsity = this->sparsity + B->getsparsity(); // 论文证明当中 sparsity 的扩张
     return C; 
 }
 
@@ -244,6 +245,7 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator*(const std::unique_ptr<S
 
     C->col_indices = C_col_indices;
     C->values = C_values;
+    C->sparsity = this->sparsity * B->getsparsity(); // 论文当中的证明
     return C;
 }
 

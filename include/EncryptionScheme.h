@@ -1,5 +1,6 @@
 #include<iostream>
 #include"LinearHE.h"
+#include"SparseMatrix.h"
 #include"polynomial.h"
 #include<vector>
 namespace shescheme {

@@ -42,7 +42,7 @@ public:
 
     virtual bool operator==(const std::unique_ptr<SparseMatrix>& B) const = 0;
     // 在稀疏矩阵末尾添加新的一列
-    //virtual std::unique_ptr<SparseMatrix> addnewcolumn(const vec_ZZ& b) const = 0;
+    virtual std::unique_ptr<SparseMatrix> addnewcolumn(const vec_ZZ& b) const = 0;
 
     // 将稀疏矩阵转化为正常的矩阵形式 (从而进行调试和性能对比)
 };
@@ -76,7 +76,8 @@ public:
     std::unique_ptr<SparseMatrix> operator*(const std::unique_ptr<SparseMatrix>& B) const override;
 
     // 还要添加一个接口，能够将一个向量当中的元素添加到稀疏矩阵的最后一列
-    //std::unique_ptr<SparseMatrix> addnewcolumn(const vec_ZZ& b) const override;
+    std::unique_ptr<SparseMatrix> addnewcolumn(const vec_ZZ& b) const override;
+    
     bool operator==(const std::unique_ptr<SparseMatrix>& B) const override {
         auto b_ptr = dynamic_cast<SparseMatrixCSR*>(B.get());
     
@@ -125,3 +126,5 @@ class SparseMatrixCSRSampler: public SparseMatrixSampler {
 public:
     std::unique_ptr<SparseMatrix> sample_RDiag(long n, long m, long k, const ZZ& q) override;
 };
+
+vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta);

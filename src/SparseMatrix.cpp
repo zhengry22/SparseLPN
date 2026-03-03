@@ -249,6 +249,86 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator*(const std::unique_ptr<S
     return C;
 }
 
+std::unique_ptr<SparseMatrix> SparseMatrixCSR::addnewcolumn(const vec_ZZ& b) const {
+    // 1. 维度检查
+    if (b.length() != this->rows) {
+        throw std::invalid_argument("Vector length must match matrix row count.");
+    }
+
+    // 2. 创建新的矩阵对象
+    // 显式调用之前讨论过的构造函数初始化维度 (rows, cols + 1, k + 1, q)
+    auto new_matrix = std::make_unique<SparseMatrixCSR>(this->rows, this->cols + 1, this->sparsity + 1, this->q);
+
+    // 预估新容量以减少内存重分配
+    // 新的非零元数量 = 原数量 + vector b 中的非零元数量
+    long b_nnz = 0;
+    for(long i = 0; i < b.length(); ++i) if (b[i] != 0) b_nnz++;
+    
+    new_matrix->values.reserve(this->values.size() + b_nnz);
+    new_matrix->col_indices.reserve(this->col_indices.size() + b_nnz);
+    new_matrix->row_ptr.resize(this->rows + 1);
+
+    // 3. 执行合并逻辑
+    new_matrix->row_ptr[0] = 0;
+    long current_nnz = 0;
+
+    for (long i = 0; i < this->rows; ++i) {
+        // A. 拷贝原始矩阵第 i 行的所有元素
+        for (long j = this->row_ptr[i]; j < this->row_ptr[i + 1]; ++j) {
+            new_matrix->values.push_back(this->values[j]);
+            new_matrix->col_indices.push_back(this->col_indices[j]);
+            current_nnz++;
+        }
+
+        // B. 检查向量 b 的第 i 个元素
+        // 如果不为 0，则作为该行最后一列（索引为原 cols）添加
+        if (b[i] != 0) {
+            new_matrix->values.push_back(b[i]);
+            new_matrix->col_indices.push_back(this->cols); // 最后一列索引
+            current_nnz++;
+        }
+
+        // C. 更新 row_ptr
+        new_matrix->row_ptr[i + 1] = current_nnz;
+    }
+
+    // 返回 unique_ptr
+    return new_matrix;
+}
+
+vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta) {
+    vec_ZZ v;
+    v.SetLength(n);
+
+    // 1. 计算概率 p = n^(-delta)
+    double p = pow((double)n, -delta);
+
+    // 2. 设置随机数引擎
+    static random_device rd;
+    static mt19937 gen(rd());
+    
+    // 伯努利分布：以 p 的概率返回 true
+    bernoulli_distribution is_nonzero(p);
+
+    for (long i = 0; i < n; ++i) {
+        if (is_nonzero(gen)) {
+            // 3. 如果不为 0，在 [1, q-1] 之间均匀采样
+            // RandomBnd(q) 生成 [0, q-1]，我们需要排除 0
+            ZZ val;
+            do {
+                val = RandomBnd(q);
+            } while (val == 0); 
+            
+            v[i] = val;
+        } else {
+            // 4. 否则设为 0
+            v[i] = 0;
+        }
+    }
+
+    return v;
+}
+
 NTL::mat_ZZ ToDense(SparseMatrixCSR& sparse) {
     NTL::mat_ZZ dense;
     

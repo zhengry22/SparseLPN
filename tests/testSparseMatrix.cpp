@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <vector>
 #include <NTL/mat_ZZ.h>
@@ -7,8 +8,30 @@
 //#define BASIC
 //#define ALGEBRA
 //#define MULT
+//#define PERFORMANCE
 using namespace std;
 using namespace NTL;
+
+// 用于调试 SparseMatrix 是否能够正确的添加一列
+    mat_ZZ removeLastColumn(const mat_ZZ& A) {
+        long m = A.NumRows();
+        long n = A.NumCols();
+    
+        if (n <= 0) {
+            return mat_ZZ(); // 如果矩阵本来就没有列，返回空
+        }
+    
+        mat_ZZ res;
+        res.SetDims(m, n - 1); // 设置新维度为 m x (n-1)
+    
+        for (long i = 0; i < m; i++) {
+            for (long j = 0; j < n - 1; j++) {
+                res[i][j] = A[i][j];
+            }
+        }
+    
+        return res;
+    }
 
 int main() {
     // --- 1. 参数设置 ---
@@ -195,6 +218,7 @@ int main() {
     if (*((*A_plus_B) * D) == (*A_times_D) + B_times_D) cout << "[PASS]  A + (B + C) = A + (B + C) 测试正确" << endl;
     else cout << "[FAIL] A + (B + C) = A + (B + C) 测试错误" << endl; 
 #endif    
+#ifdef PERFORMANCE
     cout << "最后是性能测试。我们来比对 我们编写的系数矩阵乘法 和 一般的矩阵乘法 的 效率" << endl;
     auto M1 = sampler.sample_RDiag(m, n, k1, q);
     auto M2 = sampler.sample_RDiag(m, n, k2, q);
@@ -214,7 +238,20 @@ int main() {
         auto& AA = dynamic_cast<SparseMatrixCSR&>(*A1);
         cout << "第 " << i + 2 << " 轮乘法用时 " << elapsed.count() << " 秒, 含有 " << AA.values.size() << " 个元素" << endl;
     }
-    
+#endif   
+    cout << "下面对于 插入新一列 进行测试: " << endl;
+    auto A1 = sampler.sample_RDiag(n + 1, n, k1, q);
+    auto AA1 = dynamic_cast<SparseMatrixCSR&>(*A1);
+    auto b = generateSparseBernoulliVec(n + 1, q, 2);
+    auto A1b = AA1.addnewcolumn(b);
+    auto AA1b = dynamic_cast<SparseMatrixCSR&>(*A1b);
+
+    auto A1dense = ToDense(AA1);
+    auto A1b_dense = ToDense(AA1b);
+    auto A1b_removecol = removeLastColumn(A1b_dense);
+
+    if (A1dense == A1b_removecol) cout << "[PASS] 插入新一列测试成功" << endl;
+    else cout << "[FAIL] 插入新一列测试失败" << endl;
 
     return 0;
 }

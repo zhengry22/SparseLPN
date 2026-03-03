@@ -94,6 +94,28 @@ public:
     }
 
     friend NTL::mat_ZZ ToDense(SparseMatrixCSR& sparse);
+
+    SparseMatrixCSR(const SparseMatrixCSR& other) : SparseMatrix(other.rows, other.cols, other.sparsity, other.q) {
+        // 复制 CSR 特有的成员
+        this->values = other.values;
+        this->col_indices = other.col_indices;
+        this->row_ptr = other.row_ptr;
+        // 确保 rows, cols, mod 等基类成员也得到更新（如果基类拷贝构造没处理的话)
+    }
+
+    // 为了配合拷贝构造，通常也建议加上赋值运算符
+    SparseMatrixCSR& operator=(const SparseMatrixCSR& other) {
+        if (this != &other) {
+            this->rows = other.rows;
+            this->cols = other.cols;
+            this->sparsity = other.sparsity;
+            this->q = other.q;
+            this->values = other.values;
+            this->col_indices = other.col_indices;
+            this->row_ptr = other.row_ptr;
+        }
+        return *this;
+    }
 };
 
 NTL::mat_ZZ ToDense(SparseMatrixCSR& sparse);

@@ -3,22 +3,23 @@
 #include <NTL/mat_ZZ.h>
 #include <NTL/vec_ZZ.h>
 #include "SparseMatrix.h"
-#define BASIC
-#define ALGEBRA
+#include <chrono>
+//#define BASIC
+//#define ALGEBRA
 //#define MULT
 using namespace std;
 using namespace NTL;
 
 int main() {
     // --- 1. 参数设置 ---
-    long m = 100; // 矩阵行数 (建议先用小规模验证逻辑)
-    long n = 200;  // 矩阵列数
+    long m = 2048; // 矩阵行数 (建议先用小规模验证逻辑)
+    long n = 2048;  // 矩阵列数
     long p = 150;
     long y = 170;
-    int k1 = 50;   // 每行非零元
-    int k2 = 20;
+    int k1 = 10;   // 每行非零元
+    int k2 = 10;
     int k3 = 30;
-    ZZ q = conv<ZZ>("65537");
+    ZZ q = conv<ZZ>("18446744073709551557");
     SparseMatrixCSRSampler sampler;
 #ifdef BASIC
     // --- 2. 采样两个 RDiag 矩阵 ---
@@ -126,7 +127,7 @@ int main() {
 #endif
     cout << "接下来是大矩阵各种运算定律的正确性测试，" << endl;
 
-    
+#ifdef ALGEBRA    
     auto A = sampler.sample_RDiag(m, n, k1, q);
     auto B = sampler.sample_RDiag(m, n, k2, q);
     auto C = sampler.sample_RDiag(m, n, k3, q);
@@ -193,8 +194,27 @@ int main() {
     auto B_times_D = (*B) * D;
     if (*((*A_plus_B) * D) == (*A_times_D) + B_times_D) cout << "[PASS]  A + (B + C) = A + (B + C) 测试正确" << endl;
     else cout << "[FAIL] A + (B + C) = A + (B + C) 测试错误" << endl; 
-    
+#endif    
     cout << "最后是性能测试。我们来比对 我们编写的系数矩阵乘法 和 一般的矩阵乘法 的 效率" << endl;
+    auto M1 = sampler.sample_RDiag(m, n, k1, q);
+    auto M2 = sampler.sample_RDiag(m, n, k2, q);
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    auto A1 = (*M1) * M2;
+    auto end = std::chrono::high_resolution_clock::now();
+    auto& AA = dynamic_cast<SparseMatrixCSR&>(*A1);
+    std::chrono::duration<double> elapsed = end - start;
+    cout << "第 1 轮乘法用时 " << elapsed.count() << " 秒, 含有 " << AA.values.size() << " 个元素" << endl;
+    for (int i = 0; i < 16; i++) {
+        auto M_tmp = sampler.sample_RDiag(m, n, k2, q);
+        auto start = std::chrono::high_resolution_clock::now();
+        A1 = (*A1) * M_tmp;
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        auto& AA = dynamic_cast<SparseMatrixCSR&>(*A1);
+        cout << "第 " << i + 2 << " 轮乘法用时 " << elapsed.count() << " 秒, 含有 " << AA.values.size() << " 个元素" << endl;
+    }
+    
 
     return 0;
 }

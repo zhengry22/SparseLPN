@@ -12,9 +12,9 @@ using namespace std;
 using namespace NTL;
 using NTL::ZZ;
 
-void LHE::setEvalKey(lhescheme::EvaluationKey ek_) {this->ek = ek_;}
-void LHE::setSecretKey(lhescheme::SecretKey sk_) {this->sk = sk;}
-void LHE::setPublicKey(lhescheme::PublicKey pk_) {this->pk = pk_;}
+void LHE::setEvalKey(lhescheme::EvaluationKey ek_) {this->ek = std::make_unique<lhescheme::EvaluationKey>(std::move(ek_));}
+void LHE::setSecretKey(lhescheme::SecretKey sk_) {this->sk = std::make_unique<lhescheme::SecretKey>(std::move(sk_));}
+void LHE::setPublicKey(lhescheme::PublicKey pk_) {this->pk = std::make_unique<lhescheme::PublicKey>(std::move(pk_));}
 LHE::LHE(long lambda, long tau): lambda(lambda), tau(tau) {}
 
 // Construction functions of keys
@@ -95,14 +95,14 @@ ZZ Paillier::decrypt(const ZZ& c) {
 }
 
     // 同态加法
-ZZ Paillier::add(const ZZ& c1, const ZZ& c2) {
+ZZ Paillier::add(const ZZ& c1, const ZZ& c2, const lhescheme::EvaluationKey& ek = lhescheme::EvaluationKey{}) {
     ZZ res;
     MulMod(res, c1, c2, n_sq);
     return res;
 }
 
     // 同态标量乘
-ZZ Paillier::mul(const ZZ& c, const ZZ& k) {
+ZZ Paillier::mul(const ZZ& c, const ZZ& k, const lhescheme::EvaluationKey& ek = lhescheme::EvaluationKey{}) {
     ZZ res;
     res = PowerMod(c, k, n_sq);
     return res;

@@ -20,19 +20,15 @@ double EncScheme::generate_valid_delta(int lambda_, int tau_){
     return delta;
 }
 
-long long EncScheme::generate_valid_q(
+ZZ EncScheme::generate_valid_q(
     int lambda_,
     int tau_,
     const Polynomial& poly
 ) {
     constexpr double alpha = 0.1;
     constexpr double beta  = 0.8;
-
-    int d = poly.get_degree();  
-
-    return static_cast<long long>(
-        std::ceil(lambda_ + alpha * std::sqrt(tau_) + beta * d) // Use ceiling to make sure it does not get smaller
-    );
+    // TODO
+    return conv<ZZ>("18446744073709551557");
 }
 
 // Private functions
@@ -78,8 +74,8 @@ int EncScheme::generate_valid_k(int lambda_, int tau_, int n){
     return k;
 }
 
-EncScheme::EncScheme(int lambda_, int items, LHE lhe_, Polynomial poly_): 
-    lambda(lambda_), tau(items), lhe(lhe_), poly(poly_),
+EncScheme::EncScheme(int lambda_, int items, std::unique_ptr<LHE> lhe_, Polynomial poly_): 
+    lambda(lambda_), tau(items), lhe(std::move(lhe_)), poly(poly_),
     delta(generate_valid_delta(lambda_, items)), 
     q(generate_valid_q(lambda_, items, poly_)), 
     n(generate_valid_n(lambda_, items, delta)), 
@@ -101,3 +97,185 @@ void EncScheme::print() {
 
 //-------------------Below are the functions used for the SHE scheme----------------------
 
+vec_ZZ sampleZZVector(long n, const ZZ& q) {
+    vec_ZZ v;
+    v.SetLength(n);
+
+    for (long i = 0; i < n; i++) {
+        // RandomBnd(q) 返回一个 [0, q-1] 之间的随机大整数
+        v[i] = RandomBnd(q);
+    }
+    return v;
+}
+
+std::unique_ptr<SparseMatrix> EncScheme::GSWEnc(const vec_ZZ& s, ZZ& mu) {
+    if (s.length() != this->n) {
+        throw std::invalid_argument("[EncScheme::GSWEnc] s must have a length of n! ");
+    }
+    long long l = this->n + 1;
+    
+    auto AA = this->sampler.sample_RDiag(l, n, k, q);
+    auto& A = dynamic_cast<SparseMatrixCSR&>(*AA);
+
+    vec_ZZ e = generateSparseBernoulliVec(l, this->q, this->delta);
+    vec_ZZ s_tilde = -s;
+    s_tilde.append(conv<ZZ>("1"));
+
+    auto b = A * s + e + mu * s_tilde;
+    if (b.length() != this->n + 1) {
+        throw std::invalid_argument("[EncScheme::GSWEnc] b is not n + 1 long! ");
+    }
+    for(auto &e: b) {
+        e %= this->q;
+    } 
+    auto ret = A.addnewcolumn(b);
+    if (ret->getrows() != A.getrows()) {
+        throw std::invalid_argument("[EncScheme::GSWEnc] ret's rows doesn't = A's rows! ");
+    }
+    if (ret->getcols() != A.getcols() + 1) {
+        throw std::invalid_argument("[EncScheme::GSWEnc] ret's cols doesn't = A's cols + 1! ");
+    }
+    return ret;
+}
+
+KeyPair EncScheme::keygen(const shescheme::Ciphertext& ct, const lhescheme::EvaluationKey& ek) {
+    // Note that in Paillier, there is no Eval Key, and we also need the public key
+    (*lhe).keygen(this->lambda, this->tau);
+
+    // Generate keys
+    auto raw_evalkey = (*lhe).getEvalKey();
+    auto raw_publickey = (*lhe).getPublicKey();
+    auto raw_secretkey = (*lhe).getSecretKey();
+
+    // Generate s and t
+    vec_ZZ s, t;
+    s = sampleZZVector(this->n, this->q);
+    t = sampleZZVector(this->n, this->q);
+    vec_ZZ s_tilde = -s;
+    vec_ZZ t_tilde = -t;
+    s_tilde.append(conv<ZZ>("1"));
+    t_tilde.append(conv<ZZ>("1"));
+
+    vector<std::unique_ptr<SparseMatrix>> C_ek;
+    vec_ZZ vec_ct;
+    for (long long i = 0; i < (n + 1); i++) {
+        C_ek.push_back(GSWEnc(s, t_tilde[i]));
+        vec_ct.append(this->lhe->encrypt(s_tilde[i]));
+    }
+
+    shescheme::EvaluationKey ev_key;
+    if (raw_evalkey) {
+        ev_key.ek_lhe = std::make_unique<lhescheme::EvaluationKey>(*raw_evalkey);
+    }
+    ev_key.C_ek = C_ek;
+    ev_key.vec_ct = vec_ct;
+
+    shescheme::SecretKey sc_key;
+    if (raw_secretkey) {
+        sc_key.sk_lhe = std::make_unique<lhescheme::SecretKey>(*raw_secretkey);
+    }
+    sc_key.s = s;
+    sc_key.t = t;
+
+    // Finally generate keypair and return
+    KeyPair keypair = { std::move(ev_key), std::move(sc_key) };
+    return keypair;
+}
+
+shescheme::Ciphertext EncScheme::encrypt(const shescheme::SecretKey &sk, ZZ& mu) {
+    auto aa = this->sampler.sample_RDiag(1, this->n, this->k, this->q);
+    auto& a = dynamic_cast<SparseMatrixCSR&>(*aa);
+    if (a.getrows() != 1) {
+        throw std::invalid_argument("[Encscheme::encrypt] a must have only 1 row! ");
+    }
+    if (a.row_ptr.size() != 2) {
+        throw std::invalid_argument("[Encscheme::encrypt] invalid a row_ptr size! ");
+    }
+    if (a.getcols() != sk.t.length()) {
+        throw std::invalid_argument("[Encscheme::encrypt] a and t not the same size! ");
+    }
+
+    vec_ZZ e = generateSparseBernoulliVec(1, this->q, this->delta);
+    if (e.length() != 1) {
+        throw std::invalid_argument("[Encscheme::encrypt] e is not a scalar! ");
+    }
+
+    vec_ZZ m; 
+    m.append(mu);
+    auto prod = (a * sk.t) + e + m;
+    auto c = a.addnewcolumn(prod);
+    auto& cc = dynamic_cast<SparseMatrixCSR&>(*c);
+
+    if (c->getrows() != 1) {
+        throw std::invalid_argument("[Encscheme::encrypt] c must have only 1 row! ");
+    }
+    if (cc.row_ptr.size() != 2) {
+        throw std::invalid_argument("[Encscheme::encrypt] invalid c row_ptr size! ");
+    }
+
+    shescheme::Ciphertext ct = {false, std::move(c), 1};
+    return ct;
+}
+
+shescheme::Ciphertext EncScheme::expand(const shescheme::EvaluationKey &ek, const shescheme::Ciphertext& ct) {
+    if (ct.data->getrows() != 1) {
+        throw std::invalid_argument("[Encscheme::expand] ct must have only 1 row! ");
+    }
+
+    // 为了调试方便，目前暂且只考虑 CSR 的情况，我们动态转换一下看看是不是 CSR 格式的稀疏矩阵
+    auto* csr_ptr = dynamic_cast<SparseMatrixCSR*>(ct.data.get());
+
+    if (csr_ptr) {
+        // 转换成功：它确实是一个 SparseMatrixCSR 实例
+        std::cout << "This is a SparseMatrixCSR." << std::endl;
+        if (csr_ptr->row_ptr.size() != 2) {
+            throw std::invalid_argument("[Encscheme::expand] invalid ct row_ptr size! ");
+        }
+        // 你现在可以访问 csr_ptr-> 特有的 CSR 成员了
+    } else {
+        // 转换失败：它是基类或其他派生类
+        std::cout << "This is NOT a SparseMatrixCSR." << std::endl;
+    }
+    
+    vec_ZZ c_vec = ct.data->matrixtovec();
+    if (c_vec.length() != this->n + 1) {
+        throw std::invalid_argument("[Encscheme::expand] c_vec does not have length n + 1! ");
+    }
+    if (ek.C_ek.size() != this->n + 1) {
+        throw std::invalid_argument("[Encscheme::expand] C_ek does not have length n + 1! ");
+    }
+    auto C = *(ek.C_ek[0]) * c_vec[0];
+    for (long i = 1; i < this->n + 1; i++) {
+        C = (*C) + (*(ek.C_ek[0]) * c_vec[0]);
+    }
+
+    shescheme::Ciphertext ciphertext = {true, std::move(C), 1};
+    return ciphertext;
+}
+
+ZZ EncScheme::compact(const shescheme::EvaluationKey& ek, const shescheme::Ciphertext& ct) {
+    if (!ct.is_expanded) {
+        throw std::invalid_argument("[Encscheme::compact] ct is not expanded");
+    }
+
+    vec_ZZ c = ct.data->getRowAsVec(-1); // last row of C
+
+    if (c.length() != this->n + 1) {
+        throw std::invalid_argument("[Encscheme::compact] lenght of c is not n + 1! ");
+    }
+
+    // LHE eval
+    auto lhe_ek = ek.ek_lhe.get();
+    ZZ ret = lhe->mul(ek.vec_ct[0], c[0], *lhe_ek);
+    for (long long i = 1; i < this->n + 1; i++) {
+        ret = ret + lhe->mul(ek.vec_ct[i], c[i], *lhe_ek);
+    }
+    
+    return ret;
+}
+
+ZZ EncScheme::decrypt(const shescheme::SecretKey& sk, const ZZ& ct) {
+    // Simply decrypt
+    ZZ mu = lhe->decrypt(ct);
+    return mu;
+}

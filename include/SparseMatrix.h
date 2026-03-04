@@ -44,7 +44,11 @@ public:
     // 在稀疏矩阵末尾添加新的一列
     virtual std::unique_ptr<SparseMatrix> addnewcolumn(const vec_ZZ& b) const = 0;
 
-    // 将稀疏矩阵转化为正常的矩阵形式 (从而进行调试和性能对比)
+    // 将所有的元素压缩成向量
+    virtual vec_ZZ matrixtovec() const = 0;
+
+    // 取出其中某一行
+    virtual vec_ZZ getRowAsVec(long rowIdx) const = 0;
 };
 
 // 这是一个专门用于采样 Diag 矩阵的 Sampler 类
@@ -116,6 +120,52 @@ public:
             this->row_ptr = other.row_ptr;
         }
         return *this;
+    }
+
+    vec_ZZ matrixtovec() const override {
+        vec_ZZ ret;
+        for (auto &e:this->values) {
+            ret.append(e);
+        }
+        return ret;
+    }
+
+    vec_ZZ getRowAsVec(long rowIdx) const override {
+        long r = this->rows;
+        long c = this->cols;
+
+        // 如果 rowIdx 为 -1，则指向最后一行
+        if (rowIdx == -1) {
+            rowIdx = r - 1;
+        }
+
+        // 边界检查
+        if (rowIdx < 0 || rowIdx >= r) {
+            throw std::out_of_range("[SparseMatrixCSR::getRowAsVec] Row index out of bounds in getRowAsVec");
+        }
+
+        // 1. 初始化 NTL 稠密向量
+        NTL::vec_ZZ full_row;
+        full_row.SetLength(c);
+        for (long j = 0; j < c; j++) {
+            clear(full_row[j]); // NTL 推荐使用 clear() 置零
+        }
+
+        // 2. 获取该行在 CSR 数组中的起始和结束位置
+        // 注意：row_ptr 的长度应为 r + 1
+        long start = this->row_ptr[rowIdx];
+        long end   = this->row_ptr[rowIdx + 1];
+
+        // 3. 填充非零元素
+        for (long i = start; i < end; i++) {
+            long col_idx = this->col_indices[i];
+            if (col_idx >= c) {
+                throw std::runtime_error("Column index exceeds matrix dimensions");
+            }
+            full_row[col_idx] = this->values[i];
+        }
+
+        return full_row;
     }
 };
 

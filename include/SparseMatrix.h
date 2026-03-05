@@ -1,3 +1,4 @@
+#pragma once
 #include <NTL/vec_ZZ.h>
 #include <NTL/ZZ.h>
 #include <vector>

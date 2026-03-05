@@ -2,7 +2,7 @@
 
 using namespace std;
 using namespace NTL;
-//#define USING_OPENMP
+#define USING_OPENMP
 
 SparseMatrix::SparseMatrix(long row, long col, ZZ q): rows(row), cols(col), q(q) {}
 SparseMatrix::SparseMatrix(long row, long col, long k, ZZ q): rows(row), cols(col), sparsity(k), q(q) {}

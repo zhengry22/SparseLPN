@@ -1,3 +1,4 @@
+#pragma once
 #include<iostream>
 #include"LinearHE.h"
 #include"SparseMatrix.h"
@@ -89,42 +90,41 @@ private:
     // The 3 parameters below are independent of other parameters
 
     // The polynomial to evaluate (It defines the security parameters) 
-    Polynomial poly;
+    
     SparseMatrixCSRSampler sampler;
     // Security Standards
-    int lambda;    // Safety Parameter 
-    int tau;       // Capacity 
-
+    long lambda;    // Safety Parameter 
+    long tau;       // Capacity 
+    std::unique_ptr<LHE> lhe;       // Linear HE
+    Polynomial poly;
     // LPN parameters, which is initialized using data of poly, lambda and tau.
     double delta;  // Noise rate
     ZZ q;   // Modulus
     long long n;   // Number of Columns of A, which could be calculated using lamdba and tau
-    int k;         // Sparsity
-    
-    std::unique_ptr<LHE> lhe;       // Linear HE
+    long k;         // Sparsity
 
     int get_poly_degree() const;
-    static double generate_valid_delta(int lambda_, int tau_);
-    static ZZ generate_valid_q(int lambda_, int tau_, const Polynomial& poly);
-    static long long generate_valid_n(int lambda_, int tau_, int delta); // Need delta
-    static int generate_valid_k(int lambda_, int tau_, int n);
+    static double generate_valid_delta(long lambda_, long tau_);
+    static ZZ generate_valid_q(long lambda_, long tau_, const Polynomial& poly);
+    static long long generate_valid_n(long lambda_, long tau_, double delta); // Need delta
+    static long generate_valid_k(long lambda_, long tau_, long long n);
 
 public:
     /**
      * @param lambda_ Safety parameter
      * @param max_depth How many monomials
      */
-    EncScheme(int lambda_, int items, std::unique_ptr<LHE> lhe_, Polynomial poly_);
+    EncScheme(long lambda_, long items, std::unique_ptr<LHE> lhe_, Polynomial poly_);
 
     // --- Core Operations ---
 
     std::unique_ptr<SparseMatrix> GSWEnc(const vec_ZZ& s, ZZ& mu);
-    KeyPair keygen(const shescheme::Ciphertext& ct, const lhescheme::EvaluationKey& ek);
+    KeyPair keygen();
     shescheme::Ciphertext encrypt(const shescheme::SecretKey &sk, ZZ& mu);
     shescheme::Ciphertext expand(const shescheme::EvaluationKey &ek, const shescheme::Ciphertext& ct);
     ZZ compact(const shescheme::EvaluationKey& ek, const shescheme::Ciphertext& ct);
-    ZZ decrypt(const shescheme::SecretKey& sk, const ZZ& ct);
-
+    ZZ decrypt(const ZZ& ct);
+    ZZ getmod() {return this->q;}
     // For debugging
     void print();
 };

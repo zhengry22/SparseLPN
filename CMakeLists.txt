@@ -50,8 +50,8 @@ endif()
 find_package(Eigen3 REQUIRED)
 
 # [可选] 如果你以后决定用 OpenMP，取消下面两行的注释
-# find_package(OpenMP REQUIRED)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+find_package(OpenMP REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 # ----------------------------------------------------------------
 # 4. 构建核心库 (she_core)
@@ -72,15 +72,13 @@ target_link_libraries(she_core PUBLIC
     ${NTL_LIB} 
     ${GMP_LIB} 
     Eigen3::Eigen
+    OpenMP::OpenMP_CXX
 )
 
 # ----------------------------------------------------------------
 # 5. 构建可执行文件
 # ----------------------------------------------------------------
 
-# 主程序
-add_executable(she_main src/main.cpp)
-target_link_libraries(she_main she_core)
 
 # 矩阵功能测试程序
 add_executable(testSparseMatrix tests/testSparseMatrix.cpp)
@@ -89,6 +87,10 @@ target_link_libraries(testSparseMatrix she_core)
 # LHE 测试程序
 add_executable(testLHE tests/testLHE.cpp)
 target_link_libraries(testLHE she_core)
+
+# 加密方案测试程序
+add_executable(testEncScheme tests/testEncScheme.cpp)
+target_link_libraries(testEncScheme she_core)
 
 # ----------------------------------------------------------------
 # 6. 安装/输出设置 (可选)

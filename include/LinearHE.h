@@ -1,3 +1,4 @@
+#pragma once
 #include<iostream>
 #include <NTL/ZZ_p.h>
 #include <NTL/ZZ.h>

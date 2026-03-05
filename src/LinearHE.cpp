@@ -95,14 +95,14 @@ ZZ Paillier::decrypt(const ZZ& c) {
 }
 
     // 同态加法
-ZZ Paillier::add(const ZZ& c1, const ZZ& c2, const lhescheme::EvaluationKey& ek = lhescheme::EvaluationKey{}) {
+ZZ Paillier::add(const ZZ& c1, const ZZ& c2, const lhescheme::EvaluationKey& ek) {
     ZZ res;
     MulMod(res, c1, c2, n_sq);
     return res;
 }
 
     // 同态标量乘
-ZZ Paillier::mul(const ZZ& c, const ZZ& k, const lhescheme::EvaluationKey& ek = lhescheme::EvaluationKey{}) {
+ZZ Paillier::mul(const ZZ& c, const ZZ& k, const lhescheme::EvaluationKey& ek) {
     ZZ res;
     res = PowerMod(c, k, n_sq);
     return res;

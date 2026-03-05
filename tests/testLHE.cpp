@@ -20,8 +20,9 @@ cout << "--- Starting Advanced Paillier LHE Unit Test ---" << endl;
 
     // 1. 系统初始化
     long lambda = 128; 
+    long tau = 100;
     long ell = 100;    
-    Paillier lhe(lambda, 0);
+    Paillier lhe(lambda, tau);
 
     auto start = chrono::high_resolution_clock::now();
     lhe.keygen(lambda, ell);

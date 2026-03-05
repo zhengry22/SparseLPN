@@ -1,4 +1,3 @@
-#pragma once
 #include"EncryptionScheme.h"
 #include <math.h>
 #include <random>
@@ -11,35 +10,40 @@ int EncScheme::get_poly_degree() const {
     return this->poly.get_degree();  
 }
 
-double EncScheme::generate_valid_delta(int lambda_, int tau_){
+double EncScheme::generate_valid_delta(long lambda_, long tau_){
     /*
         Use a number in (0, 1) to initialize
     */    
     constexpr double delta = 0.4;
     if ((delta >= 1) || (delta) <= 0) {throw std::invalid_argument("delta should be in (0, 1)");}
+    cout << "generate delta: " << delta << endl; 
     return delta;
 }
 
 ZZ EncScheme::generate_valid_q(
-    int lambda_,
-    int tau_,
+    long lambda_,
+    long tau_,
     const Polynomial& poly
 ) {
-    constexpr double alpha = 0.1;
-    constexpr double beta  = 0.8;
+    //constexpr double alpha = 0.1;
+    //constexpr double beta  = 0.8;
     // TODO
-    return conv<ZZ>("18446744073709551557");
+    // 先随机生成一个比较小的 mod
+    cout << "generate q: " << conv<ZZ>("65537") << endl;
+    return conv<ZZ>("65537");
 }
 
 // Private functions
-long long EncScheme::generate_valid_n(int lambda_, int tau_, int delta){
-    constexpr long long c = 10;
-    return static_cast<long long>(
+long long EncScheme::generate_valid_n(long lambda_, long tau_, double delta){
+    constexpr long long c = 1;
+    auto ret = static_cast<long long>(
         std::ceil(std::pow(tau_, (2 / delta)) * std::pow(lambda_, (c / delta))) // Use ceiling to make sure it does not get smaller
     );
+    cout << "generate n: " << ret << endl;
+    return ret;
 }
 
-int EncScheme::generate_valid_k(int lambda_, int tau_, int n){
+long EncScheme::generate_valid_k(long lambda_, long tau_, long long n){
     /*
         Generate a sparsity-index k that is:
             1. (much) smaller than n
@@ -71,10 +75,11 @@ int EncScheme::generate_valid_k(int lambda_, int tau_, int n){
         k = 1 + 2 * r; // odd number between [1, k_max]
     }
 
+    cout << "generate k: " << k << endl;
     return k;
 }
 
-EncScheme::EncScheme(int lambda_, int items, std::unique_ptr<LHE> lhe_, Polynomial poly_): 
+EncScheme::EncScheme(long lambda_, long items, std::unique_ptr<LHE> lhe_, Polynomial poly_): 
     lambda(lambda_), tau(items), lhe(std::move(lhe_)), poly(poly_),
     delta(generate_valid_delta(lambda_, items)), 
     q(generate_valid_q(lambda_, items, poly_)), 
@@ -138,7 +143,8 @@ std::unique_ptr<SparseMatrix> EncScheme::GSWEnc(const vec_ZZ& s, ZZ& mu) {
     return ret;
 }
 
-KeyPair EncScheme::keygen(const shescheme::Ciphertext& ct, const lhescheme::EvaluationKey& ek) {
+KeyPair EncScheme::keygen() {
+    cout << "calling keygen..." << endl;
     // Note that in Paillier, there is no Eval Key, and we also need the public key
     (*lhe).keygen(this->lambda, this->tau);
 
@@ -167,7 +173,7 @@ KeyPair EncScheme::keygen(const shescheme::Ciphertext& ct, const lhescheme::Eval
     if (raw_evalkey) {
         ev_key.ek_lhe = std::make_unique<lhescheme::EvaluationKey>(*raw_evalkey);
     }
-    ev_key.C_ek = C_ek;
+    ev_key.C_ek = std::move(C_ek);
     ev_key.vec_ct = vec_ct;
 
     shescheme::SecretKey sc_key;
@@ -183,6 +189,7 @@ KeyPair EncScheme::keygen(const shescheme::Ciphertext& ct, const lhescheme::Eval
 }
 
 shescheme::Ciphertext EncScheme::encrypt(const shescheme::SecretKey &sk, ZZ& mu) {
+    cout << "encrypting... " << endl;
     auto aa = this->sampler.sample_RDiag(1, this->n, this->k, this->q);
     auto& a = dynamic_cast<SparseMatrixCSR&>(*aa);
     if (a.getrows() != 1) {
@@ -218,8 +225,12 @@ shescheme::Ciphertext EncScheme::encrypt(const shescheme::SecretKey &sk, ZZ& mu)
 }
 
 shescheme::Ciphertext EncScheme::expand(const shescheme::EvaluationKey &ek, const shescheme::Ciphertext& ct) {
+    cout << "calling expand... " << endl;
     if (ct.data->getrows() != 1) {
         throw std::invalid_argument("[Encscheme::expand] ct must have only 1 row! ");
+    }
+    if (ct.is_expanded) {
+        throw std::invalid_argument("[Encscheme::expand] ct must be unexpanded! ");
     }
 
     // 为了调试方便，目前暂且只考虑 CSR 的情况，我们动态转换一下看看是不是 CSR 格式的稀疏矩阵
@@ -274,7 +285,7 @@ ZZ EncScheme::compact(const shescheme::EvaluationKey& ek, const shescheme::Ciphe
     return ret;
 }
 
-ZZ EncScheme::decrypt(const shescheme::SecretKey& sk, const ZZ& ct) {
+ZZ EncScheme::decrypt(const ZZ& ct) {
     // Simply decrypt
     ZZ mu = lhe->decrypt(ct);
     return mu;

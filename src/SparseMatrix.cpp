@@ -187,65 +187,83 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator+(const std::unique_ptr<S
 
 std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator*(const std::unique_ptr<SparseMatrix>& B) const {
     auto b_ptr = dynamic_cast<SparseMatrixCSR*>(B.get());
+    if (!b_ptr) throw std::runtime_error("CSR required");
+
+    long A_rows = this->rows;
+    long B_cols = b_ptr->getcols();
+    auto C = std::make_unique<SparseMatrixCSR>(A_rows, B_cols, this->q);
     
-    // 2. 安全检查：如果 B 实际上不是 CSR 格式，转换会返回 nullptr
-    if (!b_ptr) {
-        throw std::runtime_error("Addition only supported between two CSR matrices");
-    }
-
-    if (this->cols != b_ptr->getrows()) throw runtime_error("Dimension mismatch");
-
-    auto C = std::make_unique<SparseMatrixCSR>(rows, B->getcols(), q);
-    vector<long> C_col_indices;
-    vector<ZZ> C_values;
+    C->row_ptr.resize(A_rows + 1);
     C->row_ptr[0] = 0;
 
-    // SPA (Sparse Accumulator) 辅助结构
-    // 用于在处理每一行时进行高效累加
-    vector<ZZ> spa_values(B->getcols());
-    vector<bool> spa_occupied(B->getcols(), false);
-    vector<long> spa_indices; // 记录当前行有哪些列变成了非零
+    // 1. 我们需要为每一行独立存储计算出的非零元素，以避免线程冲突
+    // 使用 vector 的 vector 来暂存每一行的结果
+    std::vector<std::vector<long>> all_row_indices(A_rows);
+    std::vector<std::vector<ZZ>> all_row_values(A_rows);
 
-    for (long i = 0; i < this->rows; ++i) {
-        spa_indices.clear();
+    // 2. 开启 OpenMP 并行计算行
+    // schedule(dynamic) 适合稀疏矩阵，因为不同行的非零元数量差异很大
+    #pragma omp parallel
+    {
+        // 每个线程私有的 SPA 结构，避免频繁申请内存
+        std::vector<ZZ> spa_values(B_cols);
+        std::vector<bool> spa_occupied(B_cols, false);
+        std::vector<long> spa_indices;
+        spa_indices.reserve(B_cols);
 
-        // 遍历 A 的第 i 行
-        for (long j = this->row_ptr[i]; j < this->row_ptr[i+1]; ++j) {
-            long a_col = this->col_indices[j];
-            const ZZ& a_val = this->values[j];
+        #pragma omp for schedule(dynamic, 16)
+        for (long i = 0; i < A_rows; ++i) {
+            spa_indices.clear();
 
-            // 累加 B 的第 a_col 行
-            for (long k = b_ptr->row_ptr[a_col]; k < b_ptr->row_ptr[a_col+1]; ++k) {
-                long b_col = b_ptr->col_indices[k];
-                const ZZ& b_val = b_ptr->values[k];
+            // --- 核心计算逻辑 ---
+            for (long j = this->row_ptr[i]; j < this->row_ptr[i+1]; ++j) {
+                const ZZ& a_val = this->values[j];
+                long a_col = this->col_indices[j];
 
-                if (!spa_occupied[b_col]) {
-                    spa_occupied[b_col] = true;
-                    spa_indices.push_back(b_col);
-                    clear(spa_values[b_col]);
+                for (long k = b_ptr->row_ptr[a_col]; k < b_ptr->row_ptr[a_col+1]; ++k) {
+                    long b_col = b_ptr->col_indices[k];
+                    const ZZ& b_val = b_ptr->values[k];
+
+                    if (!spa_occupied[b_col]) {
+                        spa_occupied[b_col] = true;
+                        spa_indices.push_back(b_col);
+                        clear(spa_values[b_col]); 
+                    }
+                    
+                    ZZ tmp;
+                    mul(tmp, a_val, b_val);
+                    add(spa_values[b_col], spa_values[b_col], tmp);
                 }
+            }
 
-                ZZ prod;
-                mul(prod, a_val, b_val);
-                add(spa_values[b_col], spa_values[b_col], prod);
+            std::sort(spa_indices.begin(), spa_indices.end());
+
+            // 将结果存入当前行的私有暂存区
+            for (long col : spa_indices) {
+                if (this->q != 0) spa_values[col] %= this->q;
+                
+                if (spa_values[col] != 0) {
+                    all_row_indices[i].push_back(col);
+                    all_row_values[i].push_back(spa_values[col]);
+                    clear(spa_values[col]); // 及时回收 NTL 内存
+                }
+                spa_occupied[col] = false;
             }
         }
+    } // OpenMP 并行区结束
 
-        // 将 SPA 中的结果压缩进 C
-        sort(spa_indices.begin(), spa_indices.end()); // 保持 CSR 列有序
-        for (long col : spa_indices) {
-            if (spa_values[col] != 0) {
-                C_col_indices.push_back(col);
-                C_values.push_back(spa_values[col] % this->q);
-                spa_occupied[col] = false; // 重置状态供下一行使用
-            }
-        }
-        C->row_ptr[i+1] = C_col_indices.size();
+    // 3. 串行合并结果（将各行暂存区移动到 C 中）
+    // 这一步虽然是串行，但主要是内存拷贝，速度很快
+    for (long i = 0; i < A_rows; ++i) {
+        C->col_indices.insert(C->col_indices.end(), 
+                              all_row_indices[i].begin(), all_row_indices[i].end());
+        C->values.insert(C->values.end(), 
+                         std::make_move_iterator(all_row_values[i].begin()), 
+                         std::make_move_iterator(all_row_values[i].end()));
+        C->row_ptr[i+1] = C->col_indices.size();
     }
 
-    C->col_indices = C_col_indices;
-    C->values = C_values;
-    C->sparsity = this->sparsity * B->getsparsity(); // 论文当中的证明
+    C->sparsity = this->sparsity * B->getsparsity();
     return C;
 }
 

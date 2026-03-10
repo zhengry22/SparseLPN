@@ -3,6 +3,7 @@
 using namespace std;
 using namespace NTL;
 #define USING_OPENMP
+//#define WITH_ERROR
 
 SparseMatrix::SparseMatrix(long row, long col, ZZ q): rows(row), cols(col), q(q) {}
 SparseMatrix::SparseMatrix(long row, long col, long k, ZZ q): rows(row), cols(col), sparsity(k), q(q) {}
@@ -100,6 +101,7 @@ vec_ZZ SparseMatrixCSR::operator*(const vec_ZZ& x) const {
             add(y[i], y[i], tmp);
         }
         if (this->q != 0) y[i] %= this->q; 
+        if (y[i] < 0) y[i] += q;
     }
     return y;
 } // 这是最基础版本的 CSR 矩阵向量乘法，后面或许可以优化
@@ -127,6 +129,7 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator*(const ZZ& k) const {
         mul(C->values[i], this->values[i], k);
         if (this->q != 0) {
             C->values[i] %= this->q;
+            if (C->values[i] < 0) C->values[i] += q;
         }
     }
 
@@ -159,13 +162,21 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator+(const std::unique_ptr<S
             if (pA < endA && (pB >= endB || this->col_indices[pA] < b_ptr->col_indices[pB])) {
                 // 只有 A 有值或 A 的列更靠前
                 C->col_indices.push_back(this->col_indices[pA]);
-                C->values.push_back(this->values[pA] % q);
+
+                ZZ tmp = this->values[pA] % q;
+                if (tmp < 0) tmp += q;
+
+                C->values.push_back(tmp);
                 pA++;
             } 
             else if (pB < endB && (pA >= endA || b_ptr->col_indices[pB] < this->col_indices[pA])) {
                 // 只有 B 有值
                 C->col_indices.push_back(b_ptr->col_indices[pB]);
-                C->values.push_back(b_ptr->values[pB] % q);
+
+                ZZ tmp = b_ptr->values[pB] % q;
+                if (tmp < 0) tmp += q;
+
+                C->values.push_back(tmp);
                 pB++;
             } 
             else {
@@ -174,7 +185,11 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator+(const std::unique_ptr<S
                 add(sum, this->values[pA], b_ptr->values[pB]);
                 if (sum != 0) { // 只有非零才存储
                     C->col_indices.push_back(this->col_indices[pA]);
-                    C->values.push_back(sum % this->q);
+
+                    ZZ tmp = sum % this->q;
+                    if (tmp < 0) tmp += q;
+
+                    C->values.push_back(tmp);
                 }
                 pA++; pB++;
             }
@@ -241,6 +256,8 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::operator*(const std::unique_ptr<S
             // 将结果存入当前行的私有暂存区
             for (long col : spa_indices) {
                 if (this->q != 0) spa_values[col] %= this->q;
+
+                if (spa_values[col] < 0) spa_values[col] += this->q; 
                 
                 if (spa_values[col] != 0) {
                     all_row_indices[i].push_back(col);
@@ -327,23 +344,26 @@ vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta) {
     
     // 伯努利分布：以 p 的概率返回 true
     bernoulli_distribution is_nonzero(p);
-
+    long cnt = 0;
     for (long i = 0; i < n; ++i) {
         if (is_nonzero(gen)) {
             // 3. 如果不为 0，在 [1, q-1] 之间均匀采样
             // RandomBnd(q) 生成 [0, q-1]，我们需要排除 0
+            cnt++;
             ZZ val;
+            val = 0;
+#ifdef WITH_ERROR
             do {
-                val = RandomBnd(q);
+                val = RandomBnd(2);
             } while (val == 0); 
-            
+#endif
             v[i] = val;
         } else {
             // 4. 否则设为 0
             v[i] = 0;
         }
     }
-
+    //cout << "Generating bernoulli vec with " << cnt << " non-zero items" << endl;
     return v;
 }
 

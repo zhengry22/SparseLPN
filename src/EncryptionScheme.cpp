@@ -1,7 +1,9 @@
 #include"EncryptionScheme.h"
 #include <math.h>
 #include <random>
-
+#include <cmath>
+//#define TEST_EXPAND
+//#define TEST_COMPACT
 namespace shescheme {
 
 }
@@ -14,7 +16,7 @@ double EncScheme::generate_valid_delta(long lambda_, long tau_){
     /*
         Use a number in (0, 1) to initialize
     */    
-    constexpr double delta = 0.4;
+    constexpr double delta = 0.8;
     if ((delta >= 1) || (delta) <= 0) {throw std::invalid_argument("delta should be in (0, 1)");}
     cout << "generate delta: " << delta << endl; 
     return delta;
@@ -29,13 +31,17 @@ ZZ EncScheme::generate_valid_q(
     //constexpr double beta  = 0.8;
     // TODO
     // 先随机生成一个比较小的 mod
-    cout << "generate q: " << conv<ZZ>("65537") << endl;
-    return conv<ZZ>("65537");
+    cout << "generate q: " << conv<ZZ>("1073741827") << endl;
+    return conv<ZZ>("1073741827");
 }
 
 // Private functions
 long long EncScheme::generate_valid_n(long lambda_, long tau_, double delta){
-    constexpr long long c = 1;
+    constexpr long long c = 7;
+    if (tau_ == 1) {
+        //cout << "generate n: " << 6712 << endl;
+        return 2500;
+    }
     auto ret = static_cast<long long>(
         std::ceil(std::pow(tau_, (2 / delta)) * std::pow(lambda_, (c / delta))) // Use ceiling to make sure it does not get smaller
     );
@@ -50,6 +56,12 @@ long EncScheme::generate_valid_k(long lambda_, long tau_, long long n){
             2. k <= \sqrt{log{\tau} - 1}
             3. is an odd number  
     */ 
+    // Handle special cases here
+    if (tau_ == 1) {
+        //cout << "generate k: " << 2 << endl;
+        return 1; // 我们可以先考虑使用平凡的 k = 2 作为 sparsity 看一下效果
+    } 
+
     bool my_random = false;
 
     double log_tau = std::log(static_cast<double>(tau_));
@@ -132,6 +144,7 @@ std::unique_ptr<SparseMatrix> EncScheme::GSWEnc(const vec_ZZ& s, ZZ& mu) {
     }
     for(auto &e: b) {
         e %= this->q;
+        if (e < 0) e += q;
     } 
     auto ret = A.addnewcolumn(b);
     if (ret->getrows() != A.getrows()) {
@@ -157,25 +170,25 @@ KeyPair EncScheme::keygen() {
     vec_ZZ s, t;
     s = sampleZZVector(this->n, this->q);
     t = sampleZZVector(this->n, this->q);
-    vec_ZZ s_tilde = -s;
-    vec_ZZ t_tilde = -t;
-    s_tilde.append(conv<ZZ>("1"));
-    t_tilde.append(conv<ZZ>("1"));
+    // vec_ZZ s_tilde = -s;
+    // vec_ZZ t_tilde = -t;
+    // s_tilde.append(conv<ZZ>("1"));
+    // t_tilde.append(conv<ZZ>("1"));
 
-    vector<std::unique_ptr<SparseMatrix>> C_ek;
-    vec_ZZ vec_ct;
-    for (long long i = 0; i < (n + 1); i++) {
-        C_ek.push_back(GSWEnc(s, t_tilde[i]));
-        vec_ct.append(this->lhe->encrypt(s_tilde[i]));
-    }
+    // vector<std::unique_ptr<SparseMatrix>> C_ek;
+    // vec_ZZ vec_ct;
+    // for (long long i = 0; i < (n + 1); i++) {
+    //     C_ek.push_back(GSWEnc(s, t_tilde[i]));
+    //     vec_ct.append(this->lhe->encrypt(s_tilde[i]));
+    // }
 
     shescheme::EvaluationKey ev_key;
     if (raw_evalkey) {
         ev_key.ek_lhe = std::make_unique<lhescheme::EvaluationKey>(*raw_evalkey);
     }
-    ev_key.C_ek = std::move(C_ek);
-    ev_key.vec_ct = vec_ct;
-
+    // ev_key.C_ek = std::move(C_ek);
+    // ev_key.vec_ct = vec_ct;
+ 
     shescheme::SecretKey sc_key;
     if (raw_secretkey) {
         sc_key.sk_lhe = std::make_unique<lhescheme::SecretKey>(*raw_secretkey);
@@ -224,7 +237,7 @@ shescheme::Ciphertext EncScheme::encrypt(const shescheme::SecretKey &sk, ZZ& mu)
     return ct;
 }
 
-shescheme::Ciphertext EncScheme::expand(const shescheme::EvaluationKey &ek, const shescheme::Ciphertext& ct) {
+shescheme::Ciphertext EncScheme::expand(const shescheme::SecretKey &sk, const shescheme::Ciphertext& ct) {
     cout << "calling expand... " << endl;
     if (ct.data->getrows() != 1) {
         throw std::invalid_argument("[Encscheme::expand] ct must have only 1 row! ");
@@ -248,23 +261,35 @@ shescheme::Ciphertext EncScheme::expand(const shescheme::EvaluationKey &ek, cons
         std::cout << "This is NOT a SparseMatrixCSR." << std::endl;
     }
     
-    vec_ZZ c_vec = ct.data->matrixtovec();
+    vec_ZZ c_vec = ct.data->getRowAsVec(-1);
     if (c_vec.length() != this->n + 1) {
+        cout << "c_vec.length: " << c_vec.length() << endl;
         throw std::invalid_argument("[Encscheme::expand] c_vec does not have length n + 1! ");
     }
-    if (ek.C_ek.size() != this->n + 1) {
-        throw std::invalid_argument("[Encscheme::expand] C_ek does not have length n + 1! ");
-    }
-    auto C = *(ek.C_ek[0]) * c_vec[0];
-    for (long i = 1; i < this->n + 1; i++) {
-        C = (*C) + (*(ek.C_ek[0]) * c_vec[0]);
-    }
 
+    // 为了内存优化，改成在这里计算 C_{ek_i}. 首先我们需要计算 s_tilde, t_tilde
+    vec_ZZ s_tilde = -sk.s;
+    vec_ZZ t_tilde = -sk.t;
+    s_tilde.append(conv<ZZ>("1"));
+    t_tilde.append(conv<ZZ>("1"));
+    
+    cout << "Adding matrices together in expand! " << endl;
+
+    auto C = *GSWEnc(sk.s, t_tilde[0]) * c_vec[0];
+    for (long i = 1; i < this->n + 1; i++) {
+        C = (*C) + ((*GSWEnc(sk.s, t_tilde[i])) * c_vec[i]);
+#ifdef TEST_EXPAND
+        cout << "Finish adding: i = " << i << endl; 
+#endif  
+    }
+    //cout << "[Encscheme::expand] finished adding" << endl;
     shescheme::Ciphertext ciphertext = {true, std::move(C), 1};
+    //cout << "[Encscheme::expand] Returning Ciphertext..." << endl;
     return ciphertext;
 }
 
-ZZ EncScheme::compact(const shescheme::EvaluationKey& ek, const shescheme::Ciphertext& ct) {
+ZZ EncScheme::compact(const shescheme::EvaluationKey& ek, const shescheme::SecretKey &sk, const shescheme::Ciphertext& ct) {
+    cout << "[Encscheme::compact] calling compact!" << endl;
     if (!ct.is_expanded) {
         throw std::invalid_argument("[Encscheme::compact] ct is not expanded");
     }
@@ -277,16 +302,32 @@ ZZ EncScheme::compact(const shescheme::EvaluationKey& ek, const shescheme::Ciphe
 
     // LHE eval
     auto lhe_ek = ek.ek_lhe.get();
-    ZZ ret = lhe->mul(ek.vec_ct[0], c[0], *lhe_ek);
+    // 为了内存优化，改成在这里计算 C_{ek_i}. 首先我们需要计算 s_tilde, t_tilde
+    vec_ZZ s_tilde = -sk.s;
+    vec_ZZ t_tilde = -sk.t;
+    s_tilde.append(conv<ZZ>("1"));
+    t_tilde.append(conv<ZZ>("1"));
+    //cout << "[Encscheme::compact] using lhe in compact..." << endl;
+    ZZ ct0 = lhe->encrypt(s_tilde[0]);
+    //cout << "[Encscheme::compact] ready to enter loop..." << endl;
+    ZZ ret = lhe->mul(ct0, c[0], *lhe_ek);
     for (long long i = 1; i < this->n + 1; i++) {
-        ret = ret + lhe->mul(ek.vec_ct[i], c[i], *lhe_ek);
+        ZZ ct = lhe->encrypt(s_tilde[i]);
+        ret = lhe->add(ret, lhe->mul(ct, c[i], *lhe_ek), *lhe_ek); 
+#ifdef TEST_COMPACT
+        cout << "Finish adding: i = " << i << endl; 
+#endif
     }
-    
+    //cout << "[Encscheme::compact] ready to return..." << endl;
     return ret;
 }
 
 ZZ EncScheme::decrypt(const ZZ& ct) {
     // Simply decrypt
+    //cout << "[Encscheme::decrypt] calling decrypt! " << endl;
     ZZ mu = lhe->decrypt(ct);
-    return mu;
+    //cout << "[Encscheme::decrypt] returning in decrypt" << endl;
+    ZZ ret = mu % this->q;
+    if (ret < 0) ret += q;
+    return ret;
 }

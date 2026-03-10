@@ -121,8 +121,10 @@ public:
     std::unique_ptr<SparseMatrix> GSWEnc(const vec_ZZ& s, ZZ& mu);
     KeyPair keygen();
     shescheme::Ciphertext encrypt(const shescheme::SecretKey &sk, ZZ& mu);
-    shescheme::Ciphertext expand(const shescheme::EvaluationKey &ek, const shescheme::Ciphertext& ct);
-    ZZ compact(const shescheme::EvaluationKey& ek, const shescheme::Ciphertext& ct);
+    // shescheme::Ciphertext expand(const shescheme::EvaluationKey &ek, const shescheme::Ciphertext& ct);
+    // ZZ compact(const shescheme::EvaluationKey& ek, const shescheme::Ciphertext& ct);
+    shescheme::Ciphertext expand(const shescheme::SecretKey &sk, const shescheme::Ciphertext& ct);
+    ZZ compact(const shescheme::EvaluationKey& ek, const shescheme::SecretKey &sk, const shescheme::Ciphertext& ct);
     ZZ decrypt(const ZZ& ct);
     ZZ getmod() {return this->q;}
     // For debugging

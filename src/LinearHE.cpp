@@ -7,7 +7,8 @@
 #include <NTL/ZZ.h>
 #include <iostream>
 #include <algorithm>
-
+//#define TEST
+#define TEST_POWERMOD
 using namespace std;
 using namespace NTL;
 using NTL::ZZ;
@@ -50,9 +51,9 @@ void Paillier::keygen(long lambda, long ell) {
         GenPrime(q, n_bit_len / 2);
         cnt++;
     } while (GCD(p*q, (p-1)*(q-1)) != 1);
-
+#ifdef TEST
     cout << "It took " << cnt << " loops to find 2 primes p, q: " << p << ", " << q << "." << endl;
-        
+#endif 
     n = p * q;
     n_sq = n * n;
     g = n + 1; // 优化：g = n + 1
@@ -61,6 +62,9 @@ void Paillier::keygen(long lambda, long ell) {
     ZZ p_1 = p - 1;
     ZZ q_1 = q - 1;
     lambda_priv = (p_1 * q_1) / GCD(p_1, q_1); // 用这种方式计算最小公倍数
+
+    //cout << "[Paillier::keygen] lambda_priv: " << this->lambda_priv << endl;
+    //cout << "[Paillier::keygen] n_sq: " << this->n_sq << endl;
 
     // 5. 计算 mu = L(g^lambda_priv mod n^2)^-1 mod n
     ZZ u = PowerMod(g, lambda_priv, n_sq);
@@ -87,7 +91,12 @@ ZZ Paillier::encrypt(const ZZ& m) {
 }
 
 ZZ Paillier::decrypt(const ZZ& c) {
-    ZZ u = PowerMod(c, lambda_priv, n_sq);
+    //cout << "[Paillier::decrypt] parameters: " << endl;
+    //cout << "[Paillier::decrypt] c: " << c << endl;
+    //cout << "[Paillier::decrypt] lambda_priv: " << lambda_priv << endl;
+    //cout << "[Paillier::decrypt] n_sq: " << n_sq << endl;
+    ZZ c_prime = c % n_sq;
+    ZZ u = PowerMod(c_prime, lambda_priv, n_sq);
     ZZ l_u = (u - 1) / n;
     ZZ m;
     MulMod(m, l_u, mu, n);

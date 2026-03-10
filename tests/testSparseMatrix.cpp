@@ -9,7 +9,7 @@
 #define ALGEBRA
 //#define MULT
 //#define PERFORMANCE
-#define NEW_COL
+//#define NEW_COL
 using namespace std;
 using namespace NTL;
 
@@ -36,13 +36,13 @@ using namespace NTL;
 
 int main() {
     // --- 1. 参数设置 ---
-    long m = 2048; // 矩阵行数 (建议先用小规模验证逻辑)
-    long n = 2048;  // 矩阵列数
-    long p = 2048;
+    long m = 4096; // 矩阵行数 (建议先用小规模验证逻辑)
+    long n = 4096;  // 矩阵列数
+    long p = 4096;
     long y = 170;
-    int k1 = 10;   // 每行非零元
-    int k2 = 10;
-    int k3 = 10;
+    int k1 = 20;   // 每行非零元
+    int k2 = 20;
+    int k3 = 20;
     ZZ q = conv<ZZ>("18446744073709551557");
     SparseMatrixCSRSampler sampler;
 #ifdef BASIC

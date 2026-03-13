@@ -4,7 +4,7 @@
 #include <cmath>
 //#define TEST_EXPAND
 //#define TEST_COMPACT
-#define TEST_CORRECT
+//#define TEST_CORRECT
 namespace shescheme {
 
 }
@@ -187,7 +187,10 @@ std::unique_ptr<SparseMatrix> EncScheme::GSWEnc(const vec_ZZ& s, ZZ& mu) {
 KeyPair EncScheme::keygen() {
     cout << "calling keygen..." << endl;
     // Note that in Paillier, there is no Eval Key, and we also need the public key
-    (*lhe).keygen(this->lambda, this->tau);
+    ZZ newmod = (*lhe).keygen(this->lambda, this->tau);
+
+    // If we are using Paillier, then the modulus of the scheme must be changed
+    this->q = newmod;
 
     // Generate keys
     auto raw_evalkey = (*lhe).getEvalKey();

@@ -23,7 +23,7 @@ PaillierSecretKey::PaillierSecretKey(ZZ lambda_, ZZ mu_): lambda(lambda_), mu(mu
 PaillierPublicKey::PaillierPublicKey(ZZ n_, ZZ g_): n(n_), g(g_) {}
 PaillierEvaluationKey::PaillierEvaluationKey() {}
 
-void Paillier::keygen(long lambda, long ell) {
+ZZ Paillier::keygen(long lambda, long ell) {
     long n_bit_len;
 
     // 1. 基于 lambda 映射到对应的 RSA/Paillier 模数强度 (NIST 标准)
@@ -75,6 +75,9 @@ void Paillier::keygen(long lambda, long ell) {
     setPublicKey(PaillierPublicKey(n, g)); 
     setSecretKey(PaillierSecretKey(lambda_priv, mu));
     setEvalKey(PaillierEvaluationKey());
+
+    // return p
+    return p;
 }
 
 ZZ Paillier::encrypt(const ZZ& m) {

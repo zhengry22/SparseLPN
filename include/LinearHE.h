@@ -57,7 +57,7 @@ protected:
     void setPublicKey(lhescheme::PublicKey pk_);
 public:
     LHE(long lambda, long tau);
-    virtual void keygen(long lambda, long ell) = 0;
+    virtual ZZ keygen(long lambda, long ell) = 0;
     virtual ZZ encrypt(const ZZ& m) = 0;
     virtual ZZ decrypt(const ZZ& c) = 0;
     virtual ZZ add(const ZZ& c1, const ZZ& c2, const lhescheme::EvaluationKey& ek = lhescheme::EvaluationKey{}) = 0;
@@ -82,7 +82,7 @@ public:
      * @param ell 明文长度要求 (比特数)
      */
     using LHE::LHE;
-    void keygen(long lambda, long ell) override;
+    ZZ keygen(long lambda, long ell) override;
     ZZ encrypt(const ZZ& m) override;
     ZZ decrypt(const ZZ& c) override;
     ZZ add(const ZZ& c1, const ZZ& c2, const lhescheme::EvaluationKey& ek = lhescheme::EvaluationKey{}) override;

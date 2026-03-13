@@ -3,7 +3,7 @@
 using namespace std;
 using namespace NTL;
 #define USING_OPENMP
-//#define WITH_ERROR
+#define WITH_ERROR
 
 SparseMatrix::SparseMatrix(long row, long col, ZZ q): rows(row), cols(col), q(q) {}
 SparseMatrix::SparseMatrix(long row, long col, long k, ZZ q): rows(row), cols(col), sparsity(k), q(q) {}
@@ -354,7 +354,7 @@ vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta) {
             val = 0;
 #ifdef WITH_ERROR
             do {
-                val = RandomBnd(2);
+                val = RandomBnd(10);
             } while (val == 0); 
 #endif
             v[i] = val;

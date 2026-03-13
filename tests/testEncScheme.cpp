@@ -11,9 +11,11 @@ int main() {
     auto lheptr = std::make_unique<Paillier>(lambda, tau);
     Polynomial poly;
     EncScheme myscheme(lambda, tau, std::move(lheptr), poly);
-    myscheme.print();
+    
     // 建立了 EncScheme 之后
     KeyPair my_keypair = myscheme.keygen();
+    myscheme.print();
+
     ZZ mu = RandomBnd(myscheme.getmod());
     cout << "plaintext: " << mu << endl;
 
@@ -23,5 +25,11 @@ int main() {
     ZZ decrypted_plaintext = myscheme.decrypt(compacted_ct);
 
     cout << "decrypted_plaintext: " << decrypted_plaintext << endl;
+    if (mu == decrypted_plaintext) {
+        cout << "[  OK  ] decryption success" << endl; 
+    }
+    else {
+        cout << "[  FAIL  ] decryption failed" << endl;
+    }
     return 0;
 }

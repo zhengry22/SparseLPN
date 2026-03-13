@@ -91,6 +91,37 @@ cout << "--- Starting Advanced Paillier LHE Unit Test ---" << endl;
     
     print_test_result("Plaintext Space Overflow (Result mod n)", lhe.decrypt(overflow_ct) == expected_overflow);
 
+    cout << "--- Starting Multi-round Linear Combination Test ---" << endl;
+
+    int num_rounds = 10000; // 测试 20 轮累加
+    ZZ total_expected = conv<ZZ>(0);
+    ZZ total_ct = lhe.encrypt(conv<ZZ>(0)); // 初始密文为 E(0)
+
+    bool r_linear_ok = true;
+    for(int i = 0; i < num_rounds; ++i) {
+        // 1. 生成随机明文和随机标量权重
+        // 注意：如果是基础 LHE，m_i 通常建议在较小范围内以防溢出明文空间 n
+        ZZ m_i = RandomBnd(conv<ZZ>(1073741827)); 
+        ZZ k_i = RandomBnd(conv<ZZ>(1073741827));
+
+        // 2. 模拟计算: total = total + (m_i * k_i)
+        ZZ ct_i = lhe.encrypt(m_i);
+        ZZ scaled_ct = lhe.mul(ct_i, k_i); // 核心：标量乘法
+        total_ct = lhe.add(total_ct, scaled_ct); // 核心：密文加法
+
+        // 3. 更新预期结果 (要在模 n 范围内)
+        total_expected = (total_expected + m_i * k_i) % lhe.n;
+
+        // 4. 实时监控（可选）：如果中间某一轮错了，立即捕获
+        if (lhe.decrypt(total_ct) != total_expected) {
+            cout << "[DEBUG] Failed at round " << i << endl;
+            r_linear_ok = false;
+            break;
+        }
+    }
+
+    print_test_result("Multi-round Linear Combination (10000 rounds)", r_linear_ok);
+
     cout << "--- All Detailed Tests Completed ---" << endl;
 #endif
     return 0;

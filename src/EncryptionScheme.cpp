@@ -4,8 +4,33 @@
 #include <cmath>
 //#define TEST_EXPAND
 //#define TEST_COMPACT
+#define TEST_CORRECT
 namespace shescheme {
 
+}
+
+void print_NTL_vec(const vec_ZZ& vec) {
+    for (auto &e:vec) {
+        cout << e << " ";
+    }
+    cout << endl;
+}
+
+template<typename T>
+void print_vec(const vector<T>& vec) {
+    for (auto &e:vec) {
+        cout << e << " ";
+    }
+    cout << endl;
+}
+
+void print_dense_matrix(const mat_ZZ& mat) {
+    for (long i = 0; i < mat.NumRows(); i++) {
+        for (long j = 0; j < mat.NumCols(); j++) {
+            cout << mat[i][j] << " ";
+        }
+        cout << endl;
+    }
 }
 
 int EncScheme::get_poly_degree() const {
@@ -31,8 +56,11 @@ ZZ EncScheme::generate_valid_q(
     //constexpr double beta  = 0.8;
     // TODO
     // 先随机生成一个比较小的 mod
-    cout << "generate q: " << conv<ZZ>("1073741827") << endl;
-    return conv<ZZ>("1073741827");
+    //cout << "generate q: " << conv<ZZ>("1073741827") << endl;
+#ifdef TEST_CORRECT
+    return conv<ZZ>("17");
+#endif
+    return conv<ZZ>("65537");
 }
 
 // Private functions
@@ -40,7 +68,7 @@ long long EncScheme::generate_valid_n(long lambda_, long tau_, double delta){
     constexpr long long c = 7;
     if (tau_ == 1) {
         //cout << "generate n: " << 6712 << endl;
-        return 2500;
+        return 2;
     }
     auto ret = static_cast<long long>(
         std::ceil(std::pow(tau_, (2 / delta)) * std::pow(lambda_, (c / delta))) // Use ceiling to make sure it does not get smaller
@@ -170,6 +198,12 @@ KeyPair EncScheme::keygen() {
     vec_ZZ s, t;
     s = sampleZZVector(this->n, this->q);
     t = sampleZZVector(this->n, this->q);
+#ifdef TEST_CORRECT
+    cout << "generate s: ";
+    print_NTL_vec(s);
+    cout << "generate t: ";
+    print_NTL_vec(t);
+#endif 
     // vec_ZZ s_tilde = -s;
     // vec_ZZ t_tilde = -t;
     // s_tilde.append(conv<ZZ>("1"));
@@ -205,6 +239,10 @@ shescheme::Ciphertext EncScheme::encrypt(const shescheme::SecretKey &sk, ZZ& mu)
     cout << "encrypting... " << endl;
     auto aa = this->sampler.sample_RDiag(1, this->n, this->k, this->q);
     auto& a = dynamic_cast<SparseMatrixCSR&>(*aa);
+#ifdef TEST_CORRECT
+    cout << "generate a: ";
+    print_dense_matrix(ToDense(a));
+#endif
     if (a.getrows() != 1) {
         throw std::invalid_argument("[Encscheme::encrypt] a must have only 1 row! ");
     }
@@ -219,13 +257,28 @@ shescheme::Ciphertext EncScheme::encrypt(const shescheme::SecretKey &sk, ZZ& mu)
     if (e.length() != 1) {
         throw std::invalid_argument("[Encscheme::encrypt] e is not a scalar! ");
     }
-
+#ifdef TEST_CORRECT
+    cout << "generate e: "; 
+    print_NTL_vec(e);
+#endif 
     vec_ZZ m; 
     m.append(mu);
+#ifdef TEST_CORRECT
+    cout << "t vector: " ;
+    print_NTL_vec(sk.t);
+    cout << "generate m: ";
+    print_NTL_vec(m);
+#endif 
     auto prod = (a * sk.t) + e + m;
     auto c = a.addnewcolumn(prod);
     auto& cc = dynamic_cast<SparseMatrixCSR&>(*c);
-
+#ifdef TEST_CORRECT
+    cout << "product: ";
+    print_NTL_vec(prod);
+    auto dense = ToDense(cc);
+    cout << "print c: ";
+    print_dense_matrix(dense);
+#endif
     if (c->getrows() != 1) {
         throw std::invalid_argument("[Encscheme::encrypt] c must have only 1 row! ");
     }
@@ -266,18 +319,49 @@ shescheme::Ciphertext EncScheme::expand(const shescheme::SecretKey &sk, const sh
         cout << "c_vec.length: " << c_vec.length() << endl;
         throw std::invalid_argument("[Encscheme::expand] c_vec does not have length n + 1! ");
     }
+#ifdef TEST_CORRECT
+    cout << "ciphertext c: ";
+    print_NTL_vec(c_vec);
+#endif
 
     // 为了内存优化，改成在这里计算 C_{ek_i}. 首先我们需要计算 s_tilde, t_tilde
     vec_ZZ s_tilde = -sk.s;
     vec_ZZ t_tilde = -sk.t;
     s_tilde.append(conv<ZZ>("1"));
     t_tilde.append(conv<ZZ>("1"));
-    
+#ifdef TEST_CORRECT
+    cout << "s_tilde: ";
+    print_NTL_vec(s_tilde);
+    cout << "t_tilde: ";
+    print_NTL_vec(t_tilde);
+#endif     
     cout << "Adding matrices together in expand! " << endl;
+    
+    auto M = GSWEnc(sk.s, t_tilde[0]);
+    auto C = *M * c_vec[0];
 
-    auto C = *GSWEnc(sk.s, t_tilde[0]) * c_vec[0];
+#ifdef TEST_CORRECT
+    auto& M0 = dynamic_cast<SparseMatrixCSR&>(*M);
+    cout << "M0: " << endl;
+    print_dense_matrix(ToDense(M0));
+    auto& C0 = dynamic_cast<SparseMatrixCSR&>(*C);
+    cout << "C0: " << endl;
+    print_dense_matrix(ToDense(C0));
+#endif
+
     for (long i = 1; i < this->n + 1; i++) {
-        C = (*C) + ((*GSWEnc(sk.s, t_tilde[i])) * c_vec[i]);
+        auto MM = GSWEnc(sk.s, t_tilde[i]);
+        C = (*C) + (*MM * c_vec[i]);
+
+#ifdef TEST_CORRECT
+        auto& Mi = dynamic_cast<SparseMatrixCSR&>(*MM);
+        cout << "M" << i << ": " << endl;
+        print_dense_matrix(ToDense(Mi));
+        auto& Ci = dynamic_cast<SparseMatrixCSR&>(*C);
+        cout << "C" << i << ": " << endl;
+        print_dense_matrix(ToDense(Ci));
+#endif
+
 #ifdef TEST_EXPAND
         cout << "Finish adding: i = " << i << endl; 
 #endif  

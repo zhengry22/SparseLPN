@@ -2,8 +2,8 @@
 #include"EncryptionScheme.h"
 #include"SparseMatrix.h"
 #include"LinearHE.h"
+#include <cstdlib>
 using namespace std;
-
 int main() {
     // Build up test here
     long lambda = 2; 
@@ -25,11 +25,9 @@ int main() {
     ZZ decrypted_plaintext = myscheme.decrypt(compacted_ct);
 
     cout << "decrypted_plaintext: " << decrypted_plaintext << endl;
-    if (mu == decrypted_plaintext) {
-        cout << "[  OK  ] decryption success" << endl; 
-    }
-    else {
-        cout << "[  FAIL  ] decryption failed" << endl;
-    }
+    ZZ difference = decrypted_plaintext - mu;
+    double ratio = conv<double>(difference) / conv<double>(mu);
+    cout << "The difference is: " << abs(difference) << endl;
+    cout << "The difference ratio (diff / mu) is: " << abs(ratio) << endl;
     return 0;
 }

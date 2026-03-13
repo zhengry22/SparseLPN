@@ -353,9 +353,10 @@ shescheme::Ciphertext EncScheme::expand(const shescheme::SecretKey &sk, const sh
 #endif
 
     for (long i = 1; i < this->n + 1; i++) {
-        auto MM = GSWEnc(sk.s, t_tilde[i]);
-        C = (*C) + (*MM * c_vec[i]);
-
+        if (c_vec[i] != 0) {
+            auto MM = GSWEnc(sk.s, t_tilde[i]);
+            C = (*C) + (*MM * c_vec[i]);
+        }
 #ifdef TEST_CORRECT
         auto& Mi = dynamic_cast<SparseMatrixCSR&>(*MM);
         cout << "M" << i << ": " << endl;
@@ -399,8 +400,10 @@ ZZ EncScheme::compact(const shescheme::EvaluationKey& ek, const shescheme::Secre
     //cout << "[Encscheme::compact] ready to enter loop..." << endl;
     ZZ ret = lhe->mul(ct0, c[0], *lhe_ek);
     for (long long i = 1; i < this->n + 1; i++) {
-        ZZ ct = lhe->encrypt(s_tilde[i]);
-        ret = lhe->add(ret, lhe->mul(ct, c[i], *lhe_ek), *lhe_ek); 
+        if (c[i] != 0) {
+            ZZ ct = lhe->encrypt(s_tilde[i]);
+            ret = lhe->add(ret, lhe->mul(ct, c[i], *lhe_ek), *lhe_ek); 
+        }
 #ifdef TEST_COMPACT
         cout << "Finish adding: i = " << i << endl; 
 #endif

@@ -6,6 +6,9 @@
 using namespace std;
 int main() {
     // Build up test here
+
+    // 感觉参数的选取和多项式有关系
+
     long lambda = 2; 
     long tau = 1;
     auto lheptr = std::make_unique<Paillier>(lambda, tau);
@@ -21,6 +24,9 @@ int main() {
 
     shescheme::Ciphertext ciphertext = myscheme.encrypt(my_keypair.secretkey, mu);
     shescheme::Ciphertext expanded_ct =  myscheme.expand(my_keypair.secretkey, ciphertext);
+
+    // 进行多项式运算
+
     ZZ compacted_ct = myscheme.compact(my_keypair.evalkey, my_keypair.secretkey, expanded_ct);
     ZZ decrypted_plaintext = myscheme.decrypt(compacted_ct);
 

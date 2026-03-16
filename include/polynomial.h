@@ -5,13 +5,16 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
-
+#include <NTL/vec_ZZ.h>
+#include <NTL/ZZ.h>
+using namespace NTL;
+using namespace std;
 class Polynomial {
 public:
-    using Exponents = std::vector<int>;  // Each index corresponds to a variable
+    using Exponents = vector<int>;  // Each index corresponds to a variable
 private:
     std::vector<std::string> variables;           // Variable names
-    std::map<Exponents, double> terms;            /*
+    std::map<Exponents, ZZ> terms;            /*
                                                         a mapping vector, whose key is {exp1, exp2, ...} which
                                                         corresponds to the exponent of variables, and value is 
                                                         the coefficient of this term.
@@ -31,9 +34,9 @@ public:
     // Default constructor
     Polynomial();
     // Add a term: coefficient * x1^e1 * x2^e2 * ...
-    void add_term(double coeff, const Exponents& exps);
+    void add_term(ZZ coeff, const Exponents& exps);
     // Get coefficient for a specific term
-    double get_coefficient(const Exponents& exps) const;
+    ZZ get_coefficient(const Exponents& exps) const;
     // Get total number of variables
     int get_num_variables() const;
     // Get degree of polynomial (max sum of exponents)

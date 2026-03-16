@@ -19,11 +19,33 @@ int main() {
     KeyPair my_keypair = myscheme.keygen();
     myscheme.print();
 
-    ZZ mu = RandomBnd(myscheme.getmod());
-    cout << "plaintext: " << mu << endl;
+    //ZZ mu1 = RandomBnd(myscheme.getmod());
+    ZZ mu1 = RandomBnd(conv<ZZ>("10000000000"));
+    cout << "plaintext 1: " << mu1 << endl;
 
-    shescheme::Ciphertext ciphertext = myscheme.encrypt(my_keypair.secretkey, mu);
-    shescheme::Ciphertext expanded_ct =  myscheme.expand(my_keypair.secretkey, ciphertext);
+    //ZZ mu2 = RandomBnd(myscheme.getmod());
+    ZZ mu2 = RandomBnd(conv<ZZ>("10000000000"));
+    cout << "plaintext 2: " << mu2 << endl;
+
+    ZZ mu3 = RandomBnd(conv<ZZ>("10000000000"));
+    cout << "plaintext 3: " << mu2 << endl;
+
+    ZZ prod = mu1 * mu2;
+    prod = prod % myscheme.getmod();
+    prod = prod * mu3;
+    prod = prod % myscheme.getmod();
+    cout << "prod of plaintext: " << prod << endl;
+
+    shescheme::Ciphertext ciphertext1 = myscheme.encrypt(my_keypair.secretkey, mu1);
+    shescheme::Ciphertext expanded_ct1 =  myscheme.expand(my_keypair.secretkey, ciphertext1);
+
+    shescheme::Ciphertext ciphertext2 = myscheme.encrypt(my_keypair.secretkey, mu2);
+    shescheme::Ciphertext expanded_ct2 =  myscheme.expand(my_keypair.secretkey, ciphertext2);
+
+    shescheme::Ciphertext ciphertext3 = myscheme.encrypt(my_keypair.secretkey, mu3);
+    shescheme::Ciphertext expanded_ct3 =  myscheme.expand(my_keypair.secretkey, ciphertext3);
+
+    auto expanded_ct = expanded_ct1 * expanded_ct2 * expanded_ct3;
 
     // 进行多项式运算
 
@@ -31,8 +53,8 @@ int main() {
     ZZ decrypted_plaintext = myscheme.decrypt(compacted_ct);
 
     cout << "decrypted_plaintext: " << decrypted_plaintext << endl;
-    ZZ difference = decrypted_plaintext - mu;
-    double ratio = conv<double>(difference) / conv<double>(mu);
+    ZZ difference = decrypted_plaintext - prod;
+    double ratio = conv<double>(difference) / conv<double>(prod);
     cout << "The difference is: " << abs(difference) << endl;
     cout << "The difference ratio (diff / mu) is: " << abs(ratio) << endl;
     return 0;

@@ -66,10 +66,10 @@ ZZ EncScheme::generate_valid_q(
 // Private functions
 long long EncScheme::generate_valid_n(long lambda_, long tau_, double delta){
     constexpr long long c = 7;
-    if (tau_ == 1) {
-        //cout << "generate n: " << 6712 << endl;
-        return 6712;
-    }
+    
+    // 先设置为常数
+    return 1630879;
+
     auto ret = static_cast<long long>(
         std::ceil(std::pow(tau_, (2 / delta)) * std::pow(lambda_, (c / delta))) // Use ceiling to make sure it does not get smaller
     );
@@ -85,10 +85,8 @@ long EncScheme::generate_valid_k(long lambda_, long tau_, long long n){
             3. is an odd number  
     */ 
     // Handle special cases here
-    if (tau_ == 1) {
-        //cout << "generate k: " << 2 << endl;
-        return 2; // 我们可以先考虑使用平凡的 k = 2 作为 sparsity 看一下效果
-    } 
+    return 2;
+
 
     bool my_random = false;
 

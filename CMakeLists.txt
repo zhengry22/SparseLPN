@@ -92,6 +92,10 @@ target_link_libraries(testLHE she_core)
 add_executable(testEncScheme tests/testEncScheme.cpp)
 target_link_libraries(testEncScheme she_core)
 
+# 单个密文加密测试
+add_executable(testSingleEncryption tests/testSingleEncryption.cpp)
+target_link_libraries(testSingleEncryption she_core)
+
 # ----------------------------------------------------------------
 # 6. 安装/输出设置 (可选)
 # ----------------------------------------------------------------

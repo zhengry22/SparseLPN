@@ -68,7 +68,7 @@ long long EncScheme::generate_valid_n(long lambda_, long tau_, double delta){
     constexpr long long c = 7;
     
     // 先设置为常数
-    return 1630879;
+    return 288302;
 
     auto ret = static_cast<long long>(
         std::ceil(std::pow(tau_, (2 / delta)) * std::pow(lambda_, (c / delta))) // Use ceiling to make sure it does not get smaller
@@ -160,7 +160,7 @@ std::unique_ptr<SparseMatrix> EncScheme::GSWEnc(const vec_ZZ& s, ZZ& mu) {
     auto AA = this->sampler.sample_RDiag(l, n, k, q);
     auto& A = dynamic_cast<SparseMatrixCSR&>(*AA);
 
-    vec_ZZ e = generateSparseBernoulliVec(l, this->q, this->delta);
+    vec_ZZ e = generateSparseBernoulliVec(l, n, this->q, this->delta);
     vec_ZZ s_tilde = -s;
     s_tilde.append(conv<ZZ>("1"));
 
@@ -254,7 +254,7 @@ shescheme::Ciphertext EncScheme::encrypt(const shescheme::SecretKey &sk, ZZ& mu)
         throw std::invalid_argument("[Encscheme::encrypt] a and t not the same size! ");
     }
 
-    vec_ZZ e = generateSparseBernoulliVec(1, this->q, this->delta);
+    vec_ZZ e = generateSparseBernoulliVec(1, this->n, this->q, this->delta);
     if (e.length() != 1) {
         throw std::invalid_argument("[Encscheme::encrypt] e is not a scalar! ");
     }

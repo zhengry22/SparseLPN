@@ -178,4 +178,4 @@ public:
     std::unique_ptr<SparseMatrix> sample_RDiag(long n, long m, long k, const ZZ& q) override;
 };
 
-vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta);
+vec_ZZ generateSparseBernoulliVec(long length, long n, const ZZ& q, double delta);

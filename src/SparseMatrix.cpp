@@ -2,7 +2,8 @@
 
 using namespace std;
 using namespace NTL;
-#define USING_OPENMP
+//#define USING_OPENMP
+#define ERROR 10
 #define WITH_ERROR
 
 SparseMatrix::SparseMatrix(long row, long col, ZZ q): rows(row), cols(col), q(q) {}
@@ -331,13 +332,13 @@ std::unique_ptr<SparseMatrix> SparseMatrixCSR::addnewcolumn(const vec_ZZ& b) con
     return new_matrix;
 }
 
-vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta) {
+vec_ZZ generateSparseBernoulliVec(long length, long n, const ZZ& q, double delta) {
     vec_ZZ v;
-    v.SetLength(n);
+    v.SetLength(length);
 
     // 1. 计算概率 p = n^(-delta)
     double p = pow((double)n, -delta);
-
+    cout << "the probability of getting a non-zero item in error is: " << p << endl;
     // 2. 设置随机数引擎
     static random_device rd;
     static mt19937 gen(rd());
@@ -345,7 +346,7 @@ vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta) {
     // 伯努利分布：以 p 的概率返回 true
     bernoulli_distribution is_nonzero(p);
     long cnt = 0;
-    for (long i = 0; i < n; ++i) {
+    for (long i = 0; i < length; ++i) {
         if (is_nonzero(gen)) {
             // 3. 如果不为 0，在 [1, q-1] 之间均匀采样
             // RandomBnd(q) 生成 [0, q-1]，我们需要排除 0
@@ -354,7 +355,7 @@ vec_ZZ generateSparseBernoulliVec(long n, const ZZ& q, double delta) {
             val = 0;
 #ifdef WITH_ERROR
             do {
-                val = RandomBnd(2);
+                val = RandomBnd(ERROR);
             } while (val == 0); 
 #endif
             v[i] = val;

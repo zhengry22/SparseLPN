@@ -355,7 +355,7 @@ vec_ZZ generateSparseBernoulliVec(long length, long n, const ZZ& q, double delta
             val = 0;
 #ifdef WITH_ERROR
             do {
-                val = RandomBnd(ERROR);
+                val = RandomBnd(q);
             } while (val == 0); 
 #endif
             v[i] = val;
